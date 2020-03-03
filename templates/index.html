@@ -1,0 +1,16 @@
+<html>
+	<head>
+		<title>Video Metrics Collector</title>
+	</head>
+	<body>
+		<h1>Welcome</h1>
+		<a href="/new_meeting">Click here to start a new video call</a>
+		
+		<h1>Past Video Calls</h1>
+		<ul>
+		{% for call in video_calls %}
+			<li><a href="/videocalls/{{call}}/metrics">{{call}}</a></li>
+		{% endfor %}
+		</ul>
+	</body>
+</html>
