@@ -14,6 +14,7 @@ import os
 from io import BytesIO
 from datetime import datetime
 import math
+import sys
 
 app = Flask(__name__)
 
@@ -37,7 +38,7 @@ def save_call_log():
     global participant_count
     global meeting_room_url
     
-    filename = datetime.fromtimestamp(call_stats['timestamp']).strftime('%Y%m%d')+'.json'
+    filename = datetime.fromtimestamp(call_stats['timestamp']).strftime('%Y_%m_%d_%H_%M_%S')+'.json'
     filepath = 'video_logs/'+filename
     
     with open(filepath,'w') as f:
@@ -82,20 +83,22 @@ def log_network_stats():
             pid = payload['participant_id']
             
             stats = payload['netstats']['stats']['latest']
-            timestamp = stats['timestamp']
             
-            video_rcv_bps = math.floor(stats['videoRecvBitsPerSecond']/float(1000))
-            video_snd_bps = math.floor(stats['videoSendBitsPerSecond']/float(1000))
-            video_snd_pl = math.floor(stats['videoSendPacketLoss']*100)
-            video_rcv_pl = math.floor(stats['videoRecvPacketLoss']*100)
-            
-            if pid >= len(call_stats['participants']):
-                call_stats['participants'].append(participant_log)
+            if stats:
+                timestamp = stats['timestamp']
                 
-            call_stats['participants'][pid]['videoRecvBitsPerSecond'][timestamp] = video_rcv_bps
-            call_stats['participants'][pid]['videoSendBitsPerSecond'][timestamp] = video_snd_bps
-            call_stats['participants'][pid]['videoSendPacketLoss'][timestamp] = video_snd_pl
-            call_stats['participants'][pid]['videoRecvPacketLoss'][timestamp] = video_rcv_pl
+                video_rcv_bps = math.floor(stats['videoRecvBitsPerSecond']/float(1000))
+                video_snd_bps = math.floor(stats['videoSendBitsPerSecond']/float(1000))
+                video_snd_pl = math.floor(stats['videoSendPacketLoss']*100)
+                video_rcv_pl = math.floor(stats['videoRecvPacketLoss']*100)
+                
+                if pid >= len(call_stats['participants']):
+                    call_stats['participants'].append(participant_log)
+                    
+                call_stats['participants'][pid]['videoRecvBitsPerSecond'][timestamp] = video_rcv_bps
+                call_stats['participants'][pid]['videoSendBitsPerSecond'][timestamp] = video_snd_bps
+                call_stats['participants'][pid]['videoSendPacketLoss'][timestamp] = video_snd_pl
+                call_stats['participants'][pid]['videoRecvPacketLoss'][timestamp] = video_rcv_pl
             
             return Response(status=201)
     
@@ -143,7 +146,7 @@ def create_meeting_room():
     
     meeting_room_url = meeting_room['url']
     
-    return redirect(url_for('video_call'))
+    return redirect(url_for('render_video_call_page'))
 
 @app.route('/videocalls/<string:entry>/metrics/plot.png')
 def create_metrics_plot(entry):
@@ -173,15 +176,17 @@ def create_metrics_plot(entry):
                        'videoSendPacketLoss']
         plot_ylabels = ['kb/s','kb/s','percetage','percentage']
         
-        maxlen = 0
+        maxlen = -sys.maxsize
+        
         for i in range(len(call_logs['participants'])):
             for j in range(len(plot_titles)):
+                
                 tindex = list(call_logs['participants'][i][plot_titles[j]].keys())
                 maxlen = max(maxlen, len(tindex))
                 tvalues = list(call_logs['participants'][i][plot_titles[j]].values())
-                axes[j].plot(tindex,tvalues, label='Participant {0}'.format(i+1))
+                axes[j].plot(range(len(tindex)),tvalues, label='Participant {0}'.format(i+1))
                 axes[j].legend()
-        
+                
         for i in range(4):
             axes[i].set_title(plot_titles[i])
             axes[i].set_xlabel('Time in Seconds')
@@ -231,9 +236,10 @@ def render_main_page():
 
 if __name__ == '__main__':
     if not os.path.isdir('video_logs'):
-        os.make_dir('video_logs')
+        os.mkdir('video_logs')
         
     app.run(host=config['DEFAULT']['SERVER_HOST'],
             port=int(config['DEFAULT']['SERVER_PORT']),
             debug=bool(config['DEFAULT']['DEBUG_MODE']),
-            threaded=True)
+            threaded=True,
+            ssl_context='adhoc')
