@@ -123,7 +123,11 @@ def render_video_call_page():
     
     if meeting_room_url:
         pid = participant_count
-        invite_url = 'https://'+config['DEFAULT']['SERVER_NAME'] + '/videocall'
+        invite_url = ''
+        if config['DEFAULT']['PROD_MODE'] == '1':
+            invite_url = 'https://'+config['DEFAULT']['SERVER_NAME'] + '/videocall'
+        else:
+            invite_url = 'https://'+config['DEFAULT']['SERVER_HOST']+':'+config['DEFAULT']['SERVER_PORT']+'/videocall'
         participant_count+=1
         return render_template('video_call.html',
                                call_url=meeting_room_url,
