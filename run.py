@@ -1,10 +1,11 @@
 #!flask/bin/python
 """
 Video Call Metrics Collector
-Writen By: Daryle Serrant
-
+Written By:  Daryle Serrant (daryle.serrant@gmail.com)
+Description: Toy Application that collects video call metrics using the Daily.co API. By no means perfect,
+             but gets the job done.
 """
-from flask import Flask,abort, request, Response, redirect, url_for
+from flask import Flask, abort, request, Response, redirect, url_for
 from flask import render_template
 import requests
 import matplotlib.pyplot as plt
@@ -18,8 +19,13 @@ import sys
 
 app = Flask(__name__)
 
+# Get the base path of the file. We'll use this throughout the solution to reference
+# application files.
+BASE_PATH = os.path.dirname(__file__)
+VIDEO_LOG_PATH = os.path.join(BASE_PATH,'video_logs')
+
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read(os.path.join(BASE_PATH,'config.ini'))
 
 API_KEY = config['DEFAULT']['DAILY_API_KEY']
 call_stats = {}
@@ -39,7 +45,7 @@ def save_call_log():
     global meeting_room_url
     
     filename = datetime.fromtimestamp(call_stats['timestamp']).strftime('%Y_%m_%d_%H_%M_%S')+'.json'
-    filepath = 'video_logs/'+filename
+    filepath = os.path.join(VIDEO_LOG_PATH,filename)
     
     with open(filepath,'w') as f:
         json.dump(call_stats, f)
@@ -117,7 +123,7 @@ def render_video_call_page():
     
     if meeting_room_url:
         pid = participant_count
-        invite_url = config['DEFAULT']['SERVER_NAME'] + '/videocall'
+        invite_url = 'https://'+config['DEFAULT']['SERVER_NAME'] + '/videocall'
         participant_count+=1
         return render_template('video_call.html',
                                call_url=meeting_room_url,
@@ -131,7 +137,7 @@ def create_meeting_room():
     '''
     Function: create_meeting_room
     
-    Description: Creates a new video meeting, and redirects user to the video call
+    Description: Creates a new video meeting and redirects user to the video call
                  page
     '''
     global meeting_room_url
@@ -165,10 +171,11 @@ def create_metrics_plot(entry):
     image = BytesIO()
     fname = entry+".json"
     
-    video_logs = os.listdir('video_logs')
+    video_logs = os.listdir(VIDEO_LOG_PATH)
     if fname in video_logs:
         call_logs = None
-        with open('video_logs/'+fname,'r') as f:
+        fullpath = os.path.join(VIDEO_LOG_PATH,fname)
+        with open(fullpath,'r') as f:
             call_logs = json.load(f)
         fig, axes = plt.subplots(nrows=4,ncols=1, figsize=(16, 10))
         
@@ -229,17 +236,16 @@ def render_main_page():
     if len(call_stats) != 0:
         save_call_log()
     
-    video_logs = [fname.split('.')[0] for fname in os.listdir('video_logs')]
+    video_logs = [fname.split('.')[0] for fname in os.listdir(VIDEO_LOG_PATH)]
     
     return render_template('index.html',
                            video_calls = video_logs)
 
 if __name__ == '__main__':
-    if not os.path.isdir('video_logs'):
-        os.mkdir('video_logs')
+    if not os.path.isdir(VIDEO_LOG_PATH):
+        os.mkdir(VIDEO_LOG_PATH)
         
     app.run(host=config['DEFAULT']['SERVER_HOST'],
             port=int(config['DEFAULT']['SERVER_PORT']),
             debug=bool(config['DEFAULT']['DEBUG_MODE']),
-            threaded=True,
             ssl_context='adhoc')
